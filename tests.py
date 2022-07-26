@@ -50,3 +50,29 @@ class TestETRSolver(unittest.TestCase):
         self.assertTrue(etr.verify())
         etr.solve(10, 0)
         self.assertFalse(etr.verify())
+
+    def test_path_variables(self):
+        data = {"path": [
+            [0, "X", 10, 1],
+            [1, "-X", 2, 2]]}
+        etr = ETRSolver(data)
+        etr.solve(0, 12)
+        self.assertTrue(etr.verify())
+        for i in range(1, 20):
+            etr.solve(i, 12)
+            self.assertFalse(etr.verify())
+            etr.solve(i, 11.9)
+            self.assertTrue(etr.verify())
+
+    def test_cycle_variables(self):
+        data = {"cycles": {"c1": [
+            [0, "X", 1, 1],
+            [1, -1, 2, 0]]}}
+        etr = ETRSolver(data)
+        for i in range(-10, 10):
+            etr.solve(i, -5)
+            self.assertFalse(etr.verify())
+            etr.solve(i, 20)
+            self.assertTrue(etr.verify())
+
+
