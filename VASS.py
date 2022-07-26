@@ -71,7 +71,7 @@ class VASS:
         return tree
 
     def const_tree_rec(self, tree, adj_list, depth=0):
-        if depth > len(self.edges):
+        if depth > 2 * len(self.edges) * len(self.get_states()):
             return
         if tree.node == self.end:
             return
@@ -104,9 +104,9 @@ class VASS:
                             paths.append(list(reversed([child.node] + child.get_parents())))
                         if child.node in child.get_parents():
                             cycle = list()
-                            cycle.append(child.node)
+                            cycle.insert(0, child.node)
                             for item in child.get_parents():
-                                cycle.append(item)
+                                cycle.insert(0, item)
                                 if item == child.node:
                                     break
                             cycles.append(cycle)
