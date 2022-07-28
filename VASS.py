@@ -36,17 +36,40 @@ class Tree:
 
 class VASS:
     def __init__(self, data):
-        self.start = data.get("start")
-        self.end = data.get("end")
+        self.start = str(data.get("start"))
+        self.end = str(data.get("end"))
         self.init_x = data.get("start_x")
         self.init_y = data.get("start_y")
         self.target_x = data.get("end_x")
         self.target_y = data.get("end_x")
-        self.edges = data.get("edges", [])
+        self.edges = []
+        edges = data.get("edges", [])
+        states = self.get_states(edges)
+        edge_ctr = np.zeros(len(states), dtype=int)
+        for edge in edges:
+            p = str(edge["p"])
+            q = str(edge["q"])
+            x = edge["x"]
+            y = edge["y"]
+            if self.edge_exists(p, q):
+                new_state = f'{p}-{edge_ctr[states.index(edge["p"])]}'
+                edge_ctr[states.index(edge["p"])] += 1
+                self.edges.append({"p": p, "x": 0, "y": 0, "q": new_state})
+                self.edges.append({"p": new_state, "x": x, "y": y, "q": q})
+            else:
+                self.edges.append({"p": p, "x": x, "y": y, "q": q})
 
-    def get_states(self):
+    def edge_exists(self, p: str, q: str):
+        for edge in self.edges:
+            if edge["p"] == p and edge["q"] == q:
+                return True
+        return False
+
+    def get_states(self, edges=None):
+        if edges is None:
+            edges = self.edges
         states = set()
-        for item in self.edges:
+        for item in edges:
             states.add(item["p"])
             states.add(item["q"])
         return list(states)
@@ -60,9 +83,9 @@ class VASS:
 
     def get_transition(self, p: str, q: str):
         for item in self.edges:
-            if str(item["p"]) == p and str(item["q"]) == q:
+            if item["p"] == p and item["q"] == q:
                 return item["x"], item["y"]
-        print(p, q)
+        print("error", p, q)
 
     def construct_reachability_tree(self):
         tree = Tree(self.start)
@@ -73,7 +96,7 @@ class VASS:
     def const_tree_rec(self, tree, adj_list, depth=0):
         if depth > 2 * len(self.edges) * len(self.get_states()):
             return
-        if tree.node == self.end:
+        if tree.node not in adj_list:
             return
         for item in adj_list[tree.node]:
             new_tree = Tree(item, parent=tree)
@@ -115,8 +138,8 @@ class VASS:
                         break
                 if flag == 0:
                     stack.pop()
-        print(cycles)
-        print(paths)
+        print("paths", paths)
+        print("cycles", cycles)
         lpss = list()
         for path in paths:
             visited = list()
