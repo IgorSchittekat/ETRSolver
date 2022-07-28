@@ -159,11 +159,17 @@ class VASS:
                 path.insert(path.index(item), item)
             lpss.append(self.export_lps(path, basic_cycles))
 
-            for cycle in to_flatten:
-                for other_cycle in basic_cycles:
-                    if cycle[0] in other_cycle:
-                        path[path.index(other_cycle[0]) + 1:path.index(other_cycle[0]) + 1] = other_cycle[1:]
-                        lpss.append(self.export_lps(path, basic_cycles + [cycle]))
+            while to_flatten:
+                for cycle in to_flatten:
+                    flag = False
+                    for other_cycle in basic_cycles:
+                        if cycle[0] in other_cycle:
+                            path[path.index(other_cycle[0]) + 1:path.index(other_cycle[0]) + 1] = other_cycle[1:]
+                            lpss.append(self.export_lps(path, basic_cycles + [cycle]))
+                            flag = True
+                    if flag:
+                        basic_cycles.append(cycle)
+                        to_flatten.remove(cycle)
         return lpss
 
     def label_unique(self, path, cycles):
