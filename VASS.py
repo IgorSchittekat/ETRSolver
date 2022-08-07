@@ -34,7 +34,7 @@ class VASS:
     """
     This function initializes all class variables. The states are all converted to strings.
     If multiple transitions exist between two states, a new state is created as intermediate state for
-    all except one of the transitions. The update to et to this transition will always be (0, 0).
+    all except one of the transitions. The update to this transition will always be (0, 0).
     This to have no two states with more than one transition.
     :param data: json object with all info
         start: the starting state in the VASS
@@ -136,27 +136,51 @@ class VASS:
         return tree
 
     """
-    This function recursively constructs a tree, until the depth of 2 * |T| * |Q| is reached, or
-    if all new children are already in the list of parents. 
+    This function recursively constructs a tree, until all new children are already in the list of parents. 
     :param tree: the tree as the parent, to create new children for
     :param adj_list: the adjacency list to search for all children
     :param depth: to give the depth of the tree
     """
     def const_tree_rec(self, tree, adj_list, depth=0):
-        if depth > 2 * len(self.edges) * len(self.get_states()):
-            return
         for item in adj_list[tree.node]:
             new_tree = Tree(item, parent=tree)
             tree.add_child(new_tree)
             if item not in tree.get_parents():
                 self.const_tree_rec(new_tree, adj_list, depth + 1)
+    """
+    Rotate the cycle, such that the given state becomes the start and end state. 
+    If the given state is not in the cycle, or the given state is already the start and end state, do nothing.
+    :param cycle: Cycle to rotate
+    :param start: New start and end state for the cycle
+    :returns: The rotated cycle, or the same cycle is the given state is not in the cycle
+    """
+    def rotate_cycle(self, cycle, start):
+        if start not in cycle or cycle[0] == start:
+            return cycle
+        idx = cycle.index(start)
+        return cycle[idx:] + cycle[1:idx] + [start]
+
+    """
+    Check if a cycle already exists in a given list of cycles. If a rotation of the cycle exists, the cycle exists.
+    :param cycles: List of all cycles to check
+    :param new_cycle: cycle to check if it exists in the list
+    :returns: Boolean whether the cycle exists in the list or not
+    :rtype: bool
+    """
+    def cycle_exists(self, cycles, new_cycle):
+        filtered = filter(lambda x: len(x) == len(new_cycle), cycles)
+        for cycle in filtered:
+            if len(set(cycle) & set(new_cycle)) == len(set(new_cycle)):
+                if self.rotate_cycle(cycle, new_cycle[0]) == new_cycle:
+                    return True
+        return False
 
     """
     Find all paths and cycles for the linear path schemes.
     The reachability tree is iteratively traversed using preorder traversal.
     If self.end is found, the path from the start to this state is added to all paths. 
     If a state is found that also appears in the list of it's parents, a cycle is found, and this cycle is added to 
-    the list of all cycles.  
+    the list of all cycles, if this cycle is not already in the list.
     :returns: a list containing all different paths from self.start to self.end, and a list of all cycles within 
     the VASS that can be reached from self.start.
     """
@@ -170,7 +194,7 @@ class VASS:
         preorder.append(tree.node)
         stack.append(tree)
         while len(stack) > 0:
-            flag = 0
+            flag = False
             if not stack[-1].children:
                 stack.pop()
             else:
@@ -180,7 +204,8 @@ class VASS:
                         stack.append(child)
                         preorder.append(child)
                         if child.node == self.end:
-                            paths.append(list(reversed([child.node] + child.get_parents())))
+                            if child.node not in child.get_parents():
+                                paths.append(list(reversed([child.node] + child.get_parents())))
                         if child.node in child.get_parents():
                             cycle = list()
                             cycle.insert(0, child.node)
@@ -188,60 +213,82 @@ class VASS:
                                 cycle.insert(0, item)
                                 if item == child.node:
                                     break
-                            cycles.append(cycle)
+                            if not self.cycle_exists(cycles, cycle):
+                                cycles.append(cycle)
                             break
-                        flag = 1
+                        flag = True
                         break
-                if flag == 0:
+                if not flag:
                     stack.pop()
         return paths, cycles
 
     """
-    Constructs a list of (not yet all) linear path schemes that cove all possible options.
+    Constructs a list of linear path schemes that cove all possible solutions.
     For each path from self.start to self.end:
         If the start of the cycle is a state in the path, the cycle can be added to the lps. 
         If more than one cycle starts in the same state, a copy of this state is made in the path, and 
-        lined to this state with transition (0, 0), from which the path continuous. 
-        For all cycles that do not have their starting state on the path, we look for earlier added cycles that
-        have the state of these cycles, and we flatten these cycles and add them to the path. 
-        For each of these newly added cycles, we create a separate lps. 
-        This is repeated until all cycles are added to a lps. 
+        linked to this state with transition (0, 0), from which the path continuous. 
+        For all cycles that do not have a state on the path, we look for earlier added cycles that
+        have a state in these cycles, and we flatten these cycles and add them to the path. 
+        For each of these newly flattened cycles, we create a separate lps. 
+        This is repeated until all cycles are added to a lps, or no more cycles can be added.
         :returns: a list of linear path schemes. 
     """
     def linear_path_scheme(self):
         paths, cycles = self.find_paths_and_cycles()
-        print("paths", paths)
-        print("cycles", cycles)
+        print("paths", len(paths))
+        print("cycles", len(cycles))
         lpss = list()
         for path in paths:
+            # print(path)
             visited = list()
             to_flatten = list()
-            path_extend = list()
             basic_cycles = list()
             for cycle in cycles:
+                flag = True
                 if cycle[0] not in path:
-                    to_flatten.append(cycle)
-                else:
+                    intersection = list(set(cycle) & set(path))
+                    if intersection:
+                        cycle = self.rotate_cycle(cycle, intersection[0])
+                    else:
+                        flag = False
+                        if cycle not in to_flatten:
+                            to_flatten.append(cycle)
+                if flag:
                     basic_cycles.append(cycle)
                     if cycle[0] not in visited:
                         visited.append(cycle[0])
                     else:
-                        path_extend.append(cycle[0])
-            for item in path_extend:
-                path.insert(path.index(item), item)
+                        path.insert(path.index(cycle[0]), cycle[0])
             lpss.append(self.export_lps(path, basic_cycles))
 
             while to_flatten:
+                added_cycles = sorted(basic_cycles, key=len, reverse=True)
+                all_states = set([j for i in to_flatten for j in i])
+                cycle_to_flatten = None
+                for added_cycle in added_cycles:
+                    intersection = list(set(added_cycle) & all_states)
+                    if intersection:
+                        cycle_to_flatten = added_cycle
+                        break
+                if cycle_to_flatten is None:
+                    break
+                path[path.index(cycle_to_flatten[0]) + 1:path.index(cycle_to_flatten[0]) + 1] = cycle_to_flatten[1:]
+                visited = list()
+                to_remove = list()
                 for cycle in to_flatten:
-                    flag = False
-                    for other_cycle in basic_cycles:
-                        if cycle[0] in other_cycle:
-                            path[path.index(other_cycle[0]) + 1:path.index(other_cycle[0]) + 1] = other_cycle[1:]
-                            lpss.append(self.export_lps(path, basic_cycles + [cycle]))
-                            flag = True
-                    if flag:
+                    intersection = list(set(cycle) & set(path))
+                    if intersection:
+                        to_remove.append(cycle)
+                        cycle = self.rotate_cycle(cycle, intersection[0])
                         basic_cycles.append(cycle)
-                        to_flatten.remove(cycle)
+                        if cycle[0] not in visited:
+                            visited.append(cycle[0])
+                        else:
+                            path.insert(path.index(cycle[0]), cycle[0])
+                lpss.append(self.export_lps(path, basic_cycles))
+                for cycle in to_remove:
+                    to_flatten.remove(cycle)
         return lpss
 
     """
