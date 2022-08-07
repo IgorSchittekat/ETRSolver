@@ -26,6 +26,17 @@ class ETRSolver:
     def get_transitions(self):
         return self.transitions
 
+    def verify(self, target_x, target_y):
+        self.solve(target_x, target_y)
+        return self.solver.check() == sat
+
+    def model(self, target_x, target_y):
+        self.solve(target_x, target_y)
+        if self.solver.check() == sat:
+            return self.solver.model()
+        else:
+            return self.solver.check()
+
     def solve(self, target_x, target_y):
         self.solver.reset()
         path_x, path_y = Reals("path_x path_y")
@@ -41,18 +52,11 @@ class ETRSolver:
         self.solver.add(path_x + sum_x == target_x, path_y + sum_y == target_y)
 
         self.solve_negatives()
-        if self.solver.check() == sat:
-            return self.solver.model()
-        else:
-            return self.solver.check()  # Todo: raise proper error
-
-    def verify(self):
-        return self.solver.check() == sat
 
     def solve_path(self, path_x, path_y):
-        X = [Real(f'x_{item[0]}_{item[3]}') for item in self.get_path()]
-        Y = [Real(f'y_{item[0]}_{item[3]}') for item in self.get_path()]
-        alpha = [Real(f'a_{item[0]}_{item[3]}') for item in self.get_path()]
+        X = [Real(f'x_{item[0]}--{item[3]}') for item in self.get_path()]
+        Y = [Real(f'y_{item[0]}--{item[3]}') for item in self.get_path()]
+        alpha = [Real(f'a_{item[0]}--{item[3]}') for item in self.get_path()]
         sum_x = Sum([a * x for (a, x) in zip(alpha, X)])
         sum_y = Sum([a * y for (a, y) in zip(alpha, Y)])
         self.solver.add(sum_x == path_x, sum_y == path_y)
@@ -71,9 +75,9 @@ class ETRSolver:
         return result
 
     def solve_cycle(self, name, cycle_x, cycle_y):
-        X = [Real(f'x_{item[0]}_{item[3]}') for item in self.get_cycle(name)]
-        Y = [Real(f'y_{item[0]}_{item[3]}') for item in self.get_cycle(name)]
-        alpha = [Real(f'a_{item[0]}_{item[3]}') for item in self.get_cycle(name)]
+        X = [Real(f'x_{item[0]}--{item[3]}') for item in self.get_cycle(name)]
+        Y = [Real(f'y_{item[0]}--{item[3]}') for item in self.get_cycle(name)]
+        alpha = [Real(f'a_{item[0]}--{item[3]}') for item in self.get_cycle(name)]
         sum_x = Sum([a * x for (a, x) in zip(alpha, X)])
         sum_y = Sum([a * y for (a, y) in zip(alpha, Y)])
         self.solver.add(Or(And(sum_x == cycle_x, sum_y == cycle_y), And(cycle_x == 0, cycle_y == 0)))
